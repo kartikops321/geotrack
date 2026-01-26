@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Settings, Bell, CheckCircle, ChevronRight, Menu, X, User, Shield, Activity, Zap, Eye } from 'lucide-react';
+import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, ChevronRight, X, User, Shield, Activity, Zap, Eye } from 'lucide-react';
 
 // Work location config - UPDATE THESE TO YOUR OFFICE COORDINATES
 const WORK_LOCATION = {
@@ -63,7 +63,7 @@ export default function GeoTrack() {
   const [alerts, setAlerts] = useState([]);
   const [attendanceLog, setAttendanceLog] = useState([]);
   const [spotCheckLog, setSpotCheckLog] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const [currentTime, setCurrentTime] = useState(new Date());
   const [spotCheckActive, setSpotCheckActive] = useState(false);
   const [spotCheckDeadline, setSpotCheckDeadline] = useState(null);

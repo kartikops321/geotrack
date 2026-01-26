@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Settings, Bell, CheckCircle, XCircle, ChevronRight, Menu, X, User, Shield, Activity, Calendar, Zap, Eye } from 'lucide-react';
+import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Settings, Bell, CheckCircle, ChevronRight, Menu, X, User, Shield, Activity, Zap, Eye } from 'lucide-react';
 
 // Work location config - UPDATE THESE TO YOUR OFFICE COORDINATES
 const WORK_LOCATION = {

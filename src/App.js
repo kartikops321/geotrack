@@ -41,10 +41,11 @@ const formatDuration = (ms) => {
 const getRandomInterval = () => Math.floor(Math.random() * (SPOT_CHECK_CONFIG.maxInterval - SPOT_CHECK_CONFIG.minInterval)) + SPOT_CHECK_CONFIG.minInterval;
 
 const EMPLOYEES = [
-  { id: 'EMP001', name: 'Rahul Sharma', department: 'Sales', phone: '+91 98765 43210' },
-  { id: 'EMP002', name: 'Priya Patel', department: 'Marketing', phone: '+91 98765 43211' },
-  { id: 'EMP003', name: 'Amit Kumar', department: 'Operations', phone: '+91 98765 43212' },
-  { id: 'EMP004', name: 'Sneha Reddy', department: 'HR', phone: '+91 98765 43213' },
+  { id: 'EMP001', name: 'Kallu', department: 'Sales', phone: '+91 98765 43210' },
+  { id: 'EMP002', name: 'Karthu', department: 'Marketing', phone: '+91 98765 43211' },
+  { id: 'EMP003', name: 'Rahul', department: 'Operations', phone: '+91 98765 43212' },
+  { id: 'EMP004', name: 'Priya', department: 'HR', phone: '+91 98765 43213' },
+  { id: 'EMP005', name: 'Amit', department: 'Finance', phone: '+91 98765 43214' },
 ];
 
 export default function GeoTrack() {

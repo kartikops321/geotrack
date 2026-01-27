@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, X, User, Shield, Activity, Zap, Eye, Lock, Key } from 'lucide-react';
+import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, X, User, Shield, Activity, Zap, Eye, Lock, Key, Download, FileSpreadsheet } from 'lucide-react';
 
 // Work location config - UPDATE THESE TO YOUR OFFICE COORDINATES
 const WORK_LOCATION = {
@@ -29,6 +29,15 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+const formatDateTime = (date) => new Date(date).toLocaleString('en-IN', { 
+  day: '2-digit', 
+  month: '2-digit', 
+  year: 'numeric',
+  hour: '2-digit', 
+  minute: '2-digit', 
+  hour12: true 
+});
+
 const formatDuration = (ms) => {
   const hours = Math.floor(ms / (1000 * 60 * 60));
   const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
@@ -36,6 +45,13 @@ const formatDuration = (ms) => {
   if (hours > 0) return `${hours}h ${minutes}m`;
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
+};
+
+const formatDurationForExcel = (ms) => {
+  if (!ms || ms <= 0) return '0h 0m';
+  const hours = Math.floor(ms / (1000 * 60 * 60));
+  const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+  return `${hours}h ${minutes}m`;
 };
 
 const getRandomInterval = () => Math.floor(Math.random() * (SPOT_CHECK_CONFIG.maxInterval - SPOT_CHECK_CONFIG.minInterval)) + SPOT_CHECK_CONFIG.minInterval;
@@ -77,6 +93,7 @@ export default function GeoTrack() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeError, setPasswordChangeError] = useState('');
   const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
+  const [showExportModal, setShowExportModal] = useState(false);
   
   const [location, setLocation] = useState(null);
   const [locationError, setLocationError] = useState(null);
@@ -116,6 +133,91 @@ export default function GeoTrack() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Excel Export Functions
+  const exportToExcel = (type) => {
+    let csvContent = '';
+    let filename = '';
+    const today = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+    
+    if (type === 'attendance') {
+      filename = `GeoTrack_Attendance_Report_${today}.csv`;
+      csvContent = 'Employee ID,Employee Name,Department,Action,Date,Time,Location (Lat),Location (Lng),Work Duration,Break Duration,Missed Spot Checks\n';
+      
+      attendanceLog.forEach(log => {
+        const emp = employees.find(e => e.id === log.visibleTo);
+        const date = new Date(log.time).toLocaleDateString('en-IN');
+        const time = new Date(log.time).toLocaleTimeString('en-IN');
+        const lat = log.location?.latitude?.toFixed(6) || 'N/A';
+        const lng = log.location?.longitude?.toFixed(6) || 'N/A';
+        const workDuration = log.totalWorkTime ? formatDurationForExcel(log.totalWorkTime) : 'N/A';
+        const breakDuration = log.totalBreakTime ? formatDurationForExcel(log.totalBreakTime) : 'N/A';
+        const missed = log.missedSpotChecks !== undefined ? log.missedSpotChecks : 'N/A';
+        
+        csvContent += `${log.visibleTo},${log.visibleToName},${emp?.department || 'N/A'},${log.type},${date},${time},${lat},${lng},${workDuration},${breakDuration},${missed}\n`;
+      });
+    } else if (type === 'spotchecks') {
+      filename = `GeoTrack_SpotCheck_Report_${today}.csv`;
+      csvContent = 'Employee ID,Employee Name,Date,Time,Status,Location Valid,Latitude,Longitude\n';
+      
+      spotCheckLog.forEach(log => {
+        const date = new Date(log.time).toLocaleDateString('en-IN');
+        const time = new Date(log.time).toLocaleTimeString('en-IN');
+        const lat = log.location?.latitude?.toFixed(6) || 'N/A';
+        const lng = log.location?.longitude?.toFixed(6) || 'N/A';
+        
+        csvContent += `${log.visibleTo},${log.visibleToName},${date},${time},${log.status},${log.locationValid ? 'Yes' : 'No'},${lat},${lng}\n`;
+      });
+    } else if (type === 'alerts') {
+      filename = `GeoTrack_Alerts_Report_${today}.csv`;
+      csvContent = 'Alert Type,Message,Date,Time,Severity\n';
+      
+      alerts.forEach(alert => {
+        const date = new Date(alert.time).toLocaleDateString('en-IN');
+        const time = new Date(alert.time).toLocaleTimeString('en-IN');
+        
+        csvContent += `${alert.type},${alert.message},${date},${time},${alert.severity || 'Normal'}\n`;
+      });
+    } else if (type === 'employees') {
+      filename = `GeoTrack_Employees_List_${today}.csv`;
+      csvContent = 'Employee ID,Name,Username,Department,Phone,Status\n';
+      
+      employees.forEach(emp => {
+        const lastLog = attendanceLog.find(l => l.visibleTo === emp.id);
+        const isWorking = lastLog && ['clock-in', 'break-start', 'break-end'].includes(lastLog.type);
+        const status = isWorking ? (lastLog.type === 'break-start' ? 'On Break' : 'Working') : 'Offline';
+        
+        csvContent += `${emp.id},${emp.name},${emp.username},${emp.department},${emp.phone},${status}\n`;
+      });
+    } else if (type === 'summary') {
+      filename = `GeoTrack_Daily_Summary_${today}.csv`;
+      csvContent = 'Employee ID,Name,Department,Total Clock-Ins,Total Work Time,Total Break Time,Missed Spot Checks,Alerts\n';
+      
+      employees.forEach(emp => {
+        const empLogs = attendanceLog.filter(l => l.visibleTo === emp.id);
+        const clockIns = empLogs.filter(l => l.type === 'clock-in').length;
+        const clockOuts = empLogs.filter(l => l.type === 'clock-out');
+        const totalWork = clockOuts.reduce((sum, l) => sum + (l.totalWorkTime || 0), 0);
+        const totalBreak = clockOuts.reduce((sum, l) => sum + (l.totalBreakTime || 0), 0);
+        const totalMissed = clockOuts.reduce((sum, l) => sum + (l.missedSpotChecks || 0), 0);
+        const empAlerts = alerts.filter(a => a.visibleTo === emp.id).length;
+        
+        csvContent += `${emp.id},${emp.name},${emp.department},${clockIns},${formatDurationForExcel(totalWork)},${formatDurationForExcel(totalBreak)},${totalMissed},${empAlerts}\n`;
+      });
+    }
+    
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setShowExportModal(false);
+  };
 
   const triggerSpotCheck = useCallback(() => {
     setSpotCheckActive(true);
@@ -367,6 +469,88 @@ export default function GeoTrack() {
     body { background: #f5f7fa; }
     input { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
   `;
+
+  // EXPORT MODAL
+  if (showExportModal) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 }}>
+        <style>{styles}</style>
+        <div style={{ width: '100%', maxWidth: 400, background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileSpreadsheet style={{ width: 24, height: 24, color: '#22c55e' }} />
+              </div>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#111', margin: 0 }}>Export Reports</h2>
+                <p style={{ color: '#666', fontSize: 14, margin: 0 }}>Download as Excel/CSV</p>
+              </div>
+            </div>
+            <button onClick={() => setShowExportModal(false)} style={{ padding: 8, borderRadius: 8, border: 'none', background: '#f1f5f9', cursor: 'pointer' }}>
+              <X style={{ width: 20, height: 20, color: '#64748b' }} />
+            </button>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <button onClick={() => exportToExcel('attendance')} style={{ width: '100%', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Clock style={{ width: 20, height: 20, color: '#3b82f6' }} />
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>Attendance Log</p>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Clock-ins, clock-outs, breaks</p>
+              </div>
+              <Download style={{ width: 20, height: 20, color: '#94a3b8' }} />
+            </button>
+            
+            <button onClick={() => exportToExcel('spotchecks')} style={{ width: '100%', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Eye style={{ width: 20, height: 20, color: '#8b5cf6' }} />
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>Spot Check Log</p>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>All spot check records</p>
+              </div>
+              <Download style={{ width: 20, height: 20, color: '#94a3b8' }} />
+            </button>
+            
+            <button onClick={() => exportToExcel('alerts')} style={{ width: '100%', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertTriangle style={{ width: 20, height: 20, color: '#ef4444' }} />
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>Alerts Report</p>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>All alerts and warnings</p>
+              </div>
+              <Download style={{ width: 20, height: 20, color: '#94a3b8' }} />
+            </button>
+            
+            <button onClick={() => exportToExcel('employees')} style={{ width: '100%', padding: 16, borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users style={{ width: 20, height: 20, color: '#f59e0b' }} />
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>Employees List</p>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>All employee details</p>
+              </div>
+              <Download style={{ width: 20, height: 20, color: '#94a3b8' }} />
+            </button>
+            
+            <button onClick={() => exportToExcel('summary')} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', transition: 'all 0.2s' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileSpreadsheet style={{ width: 20, height: 20, color: '#fff' }} />
+              </div>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                <p style={{ fontWeight: 600, color: '#fff', margin: 0 }}>Daily Summary</p>
+                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, margin: 0 }}>Complete summary per employee</p>
+              </div>
+              <Download style={{ width: 20, height: 20, color: '#fff' }} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // SPOT CHECK MODAL
   if (spotCheckActive && view === 'employee') {
@@ -783,6 +967,9 @@ export default function GeoTrack() {
               <div><p style={{ fontWeight: 700, color: '#1e293b', margin: 0 }}>GeoTrack</p><p style={{ color: '#64748b', fontSize: 12, margin: 0 }}>Admin Panel</p></div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={() => setShowExportModal(true)} style={{ padding: 10, borderRadius: 10, border: 'none', background: '#f0fdf4', cursor: 'pointer' }} title="Export Reports">
+                <Download style={{ width: 20, height: 20, color: '#22c55e' }} />
+              </button>
               <button style={{ position: 'relative', padding: 10, borderRadius: 10, border: 'none', background: '#f1f5f9', cursor: 'pointer' }}>
                 <Bell style={{ width: 20, height: 20, color: '#64748b' }} />
                 {alerts.length > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: 10, background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{alerts.length}</span>}
@@ -796,6 +983,12 @@ export default function GeoTrack() {
         </header>
 
         <main style={{ padding: 20 }}>
+          {/* Export Button - Prominent */}
+          <button onClick={() => setShowExportModal(true)} style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 20, boxShadow: '0 4px 16px rgba(34,197,94,0.3)' }}>
+            <FileSpreadsheet style={{ width: 24, height: 24 }} />
+            Export Reports to Excel
+          </button>
+
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 20 }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>

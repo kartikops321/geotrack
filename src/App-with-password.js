@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, ChevronRight, X, User, Shield, Activity, Zap, Eye, Lock, Key } from 'lucide-react';
+import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, X, User, Shield, Activity, Zap, Eye, Lock, Key } from 'lucide-react';
 
 // Work location config - UPDATE THESE TO YOUR OFFICE COORDINATES
 const WORK_LOCATION = {
@@ -40,17 +40,17 @@ const formatDuration = (ms) => {
 
 const getRandomInterval = () => Math.floor(Math.random() * (SPOT_CHECK_CONFIG.maxInterval - SPOT_CHECK_CONFIG.minInterval)) + SPOT_CHECK_CONFIG.minInterval;
 
-// Initial employee data with passwords
+// Initial employee data with usernames and passwords
 const INITIAL_EMPLOYEES = [
-  { id: 'EMP001', name: 'Kallu', department: 'Sales', phone: '+91 98765 43210', password: '12345' },
-  { id: 'EMP002', name: 'Karthu', department: 'Marketing', phone: '+91 98765 43211', password: '12345' },
-  { id: 'EMP003', name: 'Rahul', department: 'Operations', phone: '+91 98765 43212', password: '12345' },
-  { id: 'EMP004', name: 'Priya', department: 'HR', phone: '+91 98765 43213', password: '12345' },
-  { id: 'EMP005', name: 'Amit', department: 'Finance', phone: '+91 98765 43214', password: '12345' },
+  { id: 'EMP001', username: 'kallu', name: 'Kallu', department: 'Sales', phone: '+91 98765 43210', password: '12345' },
+  { id: 'EMP002', username: 'karthu', name: 'Karthu', department: 'Marketing', phone: '+91 98765 43211', password: '12345' },
+  { id: 'EMP003', username: 'rahul', name: 'Rahul', department: 'Operations', phone: '+91 98765 43212', password: '12345' },
+  { id: 'EMP004', username: 'priya', name: 'Priya', department: 'HR', phone: '+91 98765 43213', password: '12345' },
+  { id: 'EMP005', username: 'amit', name: 'Amit', department: 'Finance', phone: '+91 98765 43214', password: '12345' },
 ];
 
 // Admin credentials
-const INITIAL_ADMIN = { id: 'ADMIN', name: 'Administrator', password: '12345' };
+const INITIAL_ADMIN = { id: 'ADMIN', username: 'admin', name: 'Administrator', password: '12345' };
 
 export default function GeoTrack() {
   // Load saved data from localStorage
@@ -65,12 +65,14 @@ export default function GeoTrack() {
   });
 
   const [view, setView] = useState('login');
+  const [loginType, setLoginType] = useState('employee'); // 'employee' or 'admin'
   const [currentUser, setCurrentUser] = useState(null);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordChangeError, setPasswordChangeError] = useState('');
@@ -259,43 +261,41 @@ export default function GeoTrack() {
     setAttendanceLog(prev => [{ id: Date.now(), visibleTo: currentUser.id, visibleToName: currentUser.name, type: 'break-end', time: new Date(), location: { ...location }, breakDuration }, ...prev]);
   };
 
-  // Login handlers
-  const handleEmployeeSelect = (emp) => {
-    setSelectedEmployee(emp);
-    setPasswordInput('');
-    setLoginError('');
-  };
+  // Login handler
+  const handleLogin = () => {
+    const username = usernameInput.trim().toLowerCase();
+    const password = passwordInput;
 
-  const handleEmployeeLogin = () => {
-    if (!passwordInput) {
+    if (!username) {
+      setLoginError('Please enter username');
+      return;
+    }
+    if (!password) {
       setLoginError('Please enter password');
       return;
     }
-    const emp = employees.find(e => e.id === selectedEmployee.id);
-    if (emp && emp.password === passwordInput) {
-      setCurrentUser(emp);
-      setView('employee');
-      setSelectedEmployee(null);
-      setPasswordInput('');
-      setLoginError('');
-    } else {
-      setLoginError('Incorrect password');
-    }
-  };
 
-  const handleAdminLogin = () => {
-    if (!passwordInput) {
-      setLoginError('Please enter password');
-      return;
-    }
-    if (passwordInput === adminCredentials.password) {
-      setCurrentUser(adminCredentials);
-      setView('admin');
-      setSelectedEmployee(null);
-      setPasswordInput('');
-      setLoginError('');
+    if (loginType === 'admin') {
+      if (username === adminCredentials.username.toLowerCase() && password === adminCredentials.password) {
+        setCurrentUser(adminCredentials);
+        setView('admin');
+        setUsernameInput('');
+        setPasswordInput('');
+        setLoginError('');
+      } else {
+        setLoginError('Invalid username or password');
+      }
     } else {
-      setLoginError('Incorrect password');
+      const emp = employees.find(e => e.username.toLowerCase() === username);
+      if (emp && emp.password === password) {
+        setCurrentUser(emp);
+        setView('employee');
+        setUsernameInput('');
+        setPasswordInput('');
+        setLoginError('');
+      } else {
+        setLoginError('Invalid username or password');
+      }
     }
   };
 
@@ -303,6 +303,18 @@ export default function GeoTrack() {
   const handleChangePassword = () => {
     setPasswordChangeError('');
     setPasswordChangeSuccess('');
+    
+    if (!currentPassword) {
+      setPasswordChangeError('Please enter current password');
+      return;
+    }
+    
+    // Verify current password
+    const correctPassword = view === 'admin' ? adminCredentials.password : currentUser.password;
+    if (currentPassword !== correctPassword) {
+      setPasswordChangeError('Current password is incorrect');
+      return;
+    }
     
     if (!newPassword || !confirmPassword) {
       setPasswordChangeError('Please fill all fields');
@@ -313,7 +325,7 @@ export default function GeoTrack() {
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordChangeError('Passwords do not match');
+      setPasswordChangeError('New passwords do not match');
       return;
     }
     
@@ -327,6 +339,7 @@ export default function GeoTrack() {
     }
     
     setPasswordChangeSuccess('Password changed successfully!');
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setTimeout(() => {
@@ -341,8 +354,11 @@ export default function GeoTrack() {
     setSelfieUrl(null);
     setIsClockedIn(false);
     setShowChangePassword(false);
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setUsernameInput('');
+    setPasswordInput('');
   };
 
   const styles = `
@@ -416,7 +432,18 @@ export default function GeoTrack() {
               <Key style={{ width: 32, height: 32, color: '#8b5cf6' }} />
             </div>
             <h2 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 8 }}>Change Password</h2>
-            <p style={{ color: '#666', fontSize: 14 }}>Enter your new password</p>
+            <p style={{ color: '#666', fontSize: 14 }}>Enter your current and new password</p>
+          </div>
+          
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              style={{ width: '100%', padding: 14, borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 16, outline: 'none' }}
+            />
           </div>
           
           <div style={{ marginBottom: 16 }}>
@@ -431,7 +458,7 @@ export default function GeoTrack() {
           </div>
           
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Confirm Password</label>
+            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Confirm New Password</label>
             <input
               type="password"
               value={confirmPassword}
@@ -454,7 +481,7 @@ export default function GeoTrack() {
           )}
           
           <div style={{ display: 'flex', gap: 12 }}>
-            <button onClick={() => { setShowChangePassword(false); setNewPassword(''); setConfirmPassword(''); setPasswordChangeError(''); }} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={() => { setShowChangePassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordChangeError(''); }} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: '#f1f5f9', color: '#475569', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
             <button onClick={handleChangePassword} style={{ flex: 1, padding: 14, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Save</button>
           </div>
         </div>
@@ -462,7 +489,7 @@ export default function GeoTrack() {
     );
   }
 
-  // LOGIN SCREEN WITH PASSWORD
+  // LOGIN SCREEN - USERNAME + PASSWORD FORM
   if (view === 'login') {
     return (
       <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -476,76 +503,119 @@ export default function GeoTrack() {
             <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16 }}>Employee Attendance & Location Monitor</p>
           </div>
           
-          {!selectedEmployee ? (
-            <>
-              <div style={{ background: '#fff', borderRadius: 24, padding: 24, marginBottom: 16, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1e293b', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <User style={{ width: 20, height: 20, color: '#6366f1' }} /> Employee Login
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {employees.map(emp => (
-                    <button key={emp.id} onClick={() => handleEmployeeSelect(emp)} style={{ width: '100%', padding: 16, borderRadius: 16, border: '1px solid #e2e8f0', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', transition: 'all 0.2s' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 18 }}>{emp.name.charAt(0)}</div>
-                        <div style={{ textAlign: 'left' }}>
-                          <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>{emp.name}</p>
-                          <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>{emp.department}</p>
-                        </div>
-                      </div>
-                      <ChevronRight style={{ width: 20, height: 20, color: '#94a3b8' }} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <button onClick={() => setSelectedEmployee({ isAdmin: true })} style={{ width: '100%', padding: 16, borderRadius: 16, border: 'none', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)', color: '#fff', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Shield style={{ width: 20, height: 20 }} /> Admin Dashboard
+          <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+            {/* Login Type Toggle */}
+            <div style={{ display: 'flex', marginBottom: 24, background: '#f1f5f9', borderRadius: 12, padding: 4 }}>
+              <button 
+                onClick={() => { setLoginType('employee'); setLoginError(''); }}
+                style={{ 
+                  flex: 1, 
+                  padding: 12, 
+                  borderRadius: 10, 
+                  border: 'none', 
+                  background: loginType === 'employee' ? '#fff' : 'transparent', 
+                  color: loginType === 'employee' ? '#6366f1' : '#64748b', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  boxShadow: loginType === 'employee' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <User style={{ width: 18, height: 18 }} /> Employee
               </button>
-            </>
-          ) : (
-            <div style={{ background: '#fff', borderRadius: 24, padding: 24, boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
-              <button onClick={() => { setSelectedEmployee(null); setPasswordInput(''); setLoginError(''); }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', color: '#6366f1', fontWeight: 500, cursor: 'pointer', marginBottom: 20, padding: 0 }}>
-                <ChevronRight style={{ width: 18, height: 18, transform: 'rotate(180deg)' }} /> Back
-              </button>
-              
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <div style={{ width: 72, height: 72, borderRadius: 18, background: selectedEmployee.isAdmin ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', color: '#fff', fontWeight: 700, fontSize: 28 }}>
-                  {selectedEmployee.isAdmin ? <Shield style={{ width: 36, height: 36 }} /> : selectedEmployee.name?.charAt(0)}
-                </div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: '#1e293b', margin: 0 }}>{selectedEmployee.isAdmin ? 'Admin Login' : selectedEmployee.name}</h2>
-                {!selectedEmployee.isAdmin && <p style={{ color: '#64748b', fontSize: 14, margin: '4px 0 0' }}>{selectedEmployee.department}</p>}
-              </div>
-              
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Password</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={passwordInput}
-                    onChange={(e) => { setPasswordInput(e.target.value); setLoginError(''); }}
-                    onKeyPress={(e) => e.key === 'Enter' && (selectedEmployee.isAdmin ? handleAdminLogin() : handleEmployeeLogin())}
-                    placeholder="Enter your password"
-                    style={{ width: '100%', padding: '14px 48px 14px 14px', borderRadius: 12, border: `1px solid ${loginError ? '#fecaca' : '#e2e8f0'}`, fontSize: 16, outline: 'none' }}
-                  />
-                  <button onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                    <Eye style={{ width: 20, height: 20, color: '#94a3b8' }} />
-                  </button>
-                </div>
-              </div>
-              
-              {loginError && (
-                <div style={{ padding: 12, borderRadius: 12, background: '#fef2f2', marginBottom: 16 }}>
-                  <p style={{ color: '#dc2626', fontSize: 14, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <AlertTriangle style={{ width: 16, height: 16 }} /> {loginError}
-                  </p>
-                </div>
-              )}
-              
-              <button onClick={selectedEmployee.isAdmin ? handleAdminLogin : handleEmployeeLogin} style={{ width: '100%', padding: 16, borderRadius: 12, border: 'none', background: selectedEmployee.isAdmin ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', fontWeight: 600, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <Lock style={{ width: 20, height: 20 }} /> Login
+              <button 
+                onClick={() => { setLoginType('admin'); setLoginError(''); }}
+                style={{ 
+                  flex: 1, 
+                  padding: 12, 
+                  borderRadius: 10, 
+                  border: 'none', 
+                  background: loginType === 'admin' ? '#fff' : 'transparent', 
+                  color: loginType === 'admin' ? '#f59e0b' : '#64748b', 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  boxShadow: loginType === 'admin' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                <Shield style={{ width: 18, height: 18 }} /> Admin
               </button>
             </div>
-          )}
+
+            {/* Username Field */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Username</label>
+              <div style={{ position: 'relative' }}>
+                <User style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, color: '#94a3b8' }} />
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(e) => { setUsernameInput(e.target.value); setLoginError(''); }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                  placeholder="Enter your username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  style={{ width: '100%', padding: '14px 14px 14px 48px', borderRadius: 12, border: `1px solid ${loginError ? '#fecaca' : '#e2e8f0'}`, fontSize: 16, outline: 'none' }}
+                />
+              </div>
+            </div>
+            
+            {/* Password Field */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151', fontSize: 14 }}>Password</label>
+              <div style={{ position: 'relative' }}>
+                <Lock style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, color: '#94a3b8' }} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={passwordInput}
+                  onChange={(e) => { setPasswordInput(e.target.value); setLoginError(''); }}
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                  placeholder="Enter your password"
+                  style={{ width: '100%', padding: '14px 48px 14px 48px', borderRadius: 12, border: `1px solid ${loginError ? '#fecaca' : '#e2e8f0'}`, fontSize: 16, outline: 'none' }}
+                />
+                <button onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  <Eye style={{ width: 20, height: 20, color: showPassword ? '#6366f1' : '#94a3b8' }} />
+                </button>
+              </div>
+            </div>
+            
+            {/* Error Message */}
+            {loginError && (
+              <div style={{ padding: 12, borderRadius: 12, background: '#fef2f2', marginBottom: 16 }}>
+                <p style={{ color: '#dc2626', fontSize: 14, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle style={{ width: 16, height: 16 }} /> {loginError}
+                </p>
+              </div>
+            )}
+            
+            {/* Login Button */}
+            <button 
+              onClick={handleLogin} 
+              style={{ 
+                width: '100%', 
+                padding: 16, 
+                borderRadius: 12, 
+                border: 'none', 
+                background: loginType === 'admin' ? 'linear-gradient(135deg, #f59e0b, #ea580c)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)', 
+                color: '#fff', 
+                fontWeight: 600, 
+                fontSize: 16, 
+                cursor: 'pointer', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: 8 
+              }}
+            >
+              <LogIn style={{ width: 20, height: 20 }} /> Login
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -562,7 +632,7 @@ export default function GeoTrack() {
               <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600 }}>{currentUser?.name?.charAt(0)}</div>
               <div>
                 <p style={{ fontWeight: 600, color: '#1e293b', margin: 0 }}>{currentUser?.name}</p>
-                <p style={{ color: '#64748b', fontSize: 13, margin: 0, fontFamily: 'monospace' }}>{currentUser?.id}</p>
+                <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>{currentUser?.department}</p>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>

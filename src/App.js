@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Camera, MapPin, Clock, Coffee, LogIn, LogOut, AlertTriangle, Users, Bell, CheckCircle, X, User, Shield, Activity, Zap, Eye, Lock, Key, Download, FileSpreadsheet } from 'lucide-react';
 
-// Work location config - UPDATE THESE TO YOUR OFFICE COORDINATES
+// Work location config - YOUR OFFICE COORDINATES
 const WORK_LOCATION = {
-  latitude: 17.4401,
-  longitude: 78.3489,
+  latitude: 17.8600393,
+  longitude: 76.9492326,
   radius: 100,
-  name: "Main Office - Hyderabad"
+  name: "Office Location"
 };
 
 // Spot check settings
@@ -28,15 +28,6 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 const formatTime = (date) => new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-
-const formatDateTime = (date) => new Date(date).toLocaleString('en-IN', { 
-  day: '2-digit', 
-  month: '2-digit', 
-  year: 'numeric',
-  hour: '2-digit', 
-  minute: '2-digit', 
-  hour12: true 
-});
 
 const formatDuration = (ms) => {
   const hours = Math.floor(ms / (1000 * 60 * 60));
